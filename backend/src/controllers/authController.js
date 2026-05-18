@@ -1,9 +1,6 @@
-import { AppDataSource } from '../config/data-source.js';
-import { User } from '../entities/User.js';
+import { supabase } from '../config/supabaseClient.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const userRepository = AppDataSource.getRepository(User);
 
 const generateToken = (userId) => {
   return jwt.sign(
@@ -21,7 +18,15 @@ export const register = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const existingUser = await userRepository.findOne({ where: { email } });
+    const { data: existingUser, error: existingError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingError) {
+      return res.status(500).json({ error: existingError.message });
+    }
 
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
@@ -29,15 +34,21 @@ export const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = userRepository.create({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: 'user',
-    });
+    const { data: user, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role: 'user',
+      })
+      .select('id, email, firstName, lastName, role')
+      .single();
 
-    await userRepository.save(user);
+    if (insertError) {
+      return res.status(500).json({ error: insertError.message });
+    }
 
     const token = generateToken(user.id);
 
@@ -65,7 +76,15 @@ export const login = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await userRepository.findOne({ where: { email } });
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (userError) {
+      return res.status(500).json({ error: userError.message });
+    }
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -97,7 +116,15 @@ export const login = async (req, res) => {
 
 export const me = async (req, res) => {
   try {
-    const user = await userRepository.findOne({ where: { id: req.user.userId } });
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, email, firstName, lastName, role')
+      .eq('id', req.user.userId)
+      .maybeSingle();
+
+    if (userError) {
+      return res.status(500).json({ error: userError.message });
+    }
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

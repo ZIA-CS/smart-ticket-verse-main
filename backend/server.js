@@ -1,8 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import dns from 'node:dns';
-import { AppDataSource } from './src/config/data-source.js';
 import authRouter from './src/routes/auth.js';
 import usersRouter from './src/routes/users.js';
 import eventsRouter from './src/routes/events.js';
@@ -11,7 +9,6 @@ import { errorHandler } from './src/middleware/auth.js';
 import { validateEnv } from './src/utils/validateEnv.js';
 
 dotenv.config();
-dns.setDefaultResultOrder('ipv4first');
 validateEnv();
 
 const app = express();
@@ -21,16 +18,6 @@ const DEFAULT_PORT = Number(process.env.PORT || 3000);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Initialize Database
-AppDataSource.initialize()
-  .then(() => {
-    console.log('Database connected successfully');
-  })
-  .catch((err) => {
-    console.error('Error during Data Source initialization:', err);
-    process.exit(1);
-  });
 
 // Routes
 app.use('/api/auth', authRouter);

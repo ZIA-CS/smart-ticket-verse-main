@@ -1,8 +1,5 @@
-import { AppDataSource } from '../config/data-source.js';
-import { Ticket } from '../entities/Ticket.js';
+import { supabase } from '../config/supabaseClient.js';
 import crypto from 'crypto';
-
-const ticketRepository = AppDataSource.getRepository(Ticket);
 
 const generateTicketCode = () => {
   return crypto.randomBytes(12).toString('hex');
@@ -10,7 +7,12 @@ const generateTicketCode = () => {
 
 export const getAllTickets = async (req, res) => {
   try {
-    const tickets = await ticketRepository.find();
+    const { data: tickets, error } = await supabase.from('tickets').select('*');
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
     res.json(tickets);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -20,7 +22,15 @@ export const getAllTickets = async (req, res) => {
 export const getTicketById = async (req, res) => {
   try {
     const { id } = req.params;
-    const ticket = await ticketRepository.findOne({ where: { id } });
+    const { data: ticket, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -35,7 +45,14 @@ export const getTicketById = async (req, res) => {
 export const getTicketsByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const tickets = await ticketRepository.find({ where: { eventId } });
+    const { data: tickets, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('eventId', eventId);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     res.json(tickets);
   } catch (error) {
@@ -51,14 +68,21 @@ export const createTicket = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const ticket = ticketRepository.create({
-      eventId,
-      userId,
-      ticketCode: generateTicketCode(),
-      status: 'active',
-    });
+    const { data: ticket, error } = await supabase
+      .from('tickets')
+      .insert({
+        eventId,
+        userId,
+        ticketCode: generateTicketCode(),
+        status: 'active',
+      })
+      .select('*')
+      .single();
 
-    await ticketRepository.save(ticket);
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
     res.status(201).json(ticket);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -68,7 +92,15 @@ export const createTicket = async (req, res) => {
 export const scanTicket = async (req, res) => {
   try {
     const { id } = req.params;
-    const ticket = await ticketRepository.findOne({ where: { id } });
+    const { data: ticket, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -78,11 +110,21 @@ export const scanTicket = async (req, res) => {
       return res.status(400).json({ error: 'Ticket already used' });
     }
 
-    ticket.status = 'used';
-    ticket.usedAt = new Date();
+    const { data: updatedTicket, error: updateError } = await supabase
+      .from('tickets')
+      .update({
+        status: 'used',
+        usedAt: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
 
-    await ticketRepository.save(ticket);
-    res.json({ message: 'Ticket scanned successfully', ticket });
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    res.json({ message: 'Ticket scanned successfully', ticket: updatedTicket });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -91,9 +133,18 @@ export const scanTicket = async (req, res) => {
 export const deleteTicket = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await ticketRepository.delete({ id });
+    const { data, error } = await supabase
+      .from('tickets')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
 
-    if (result.affected === 0) {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
