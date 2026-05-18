@@ -10,6 +10,9 @@ dotenv.config();
 
 const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
 const useSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+const forceIpv4 = process.env.DB_FORCE_IPV4
+  ? String(process.env.DB_FORCE_IPV4).toLowerCase() === 'true'
+  : process.env.NODE_ENV === 'production';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -20,6 +23,7 @@ export const AppDataSource = new DataSource({
   password: dbUrl ? undefined : process.env.DB_PASSWORD || 'password',
   database: dbUrl ? undefined : process.env.DB_DATABASE || 'smart_ticket_verse',
   ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+  extra: forceIpv4 ? { family: 4 } : undefined,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Result, Event, Ticket],
