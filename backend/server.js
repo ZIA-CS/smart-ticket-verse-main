@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import dns from 'node:dns';
 import { AppDataSource } from './src/config/data-source.js';
 import authRouter from './src/routes/auth.js';
 import usersRouter from './src/routes/users.js';
@@ -10,6 +11,7 @@ import { errorHandler } from './src/middleware/auth.js';
 import { validateEnv } from './src/utils/validateEnv.js';
 
 dotenv.config();
+dns.setDefaultResultOrder('ipv4first');
 validateEnv();
 
 const app = express();
