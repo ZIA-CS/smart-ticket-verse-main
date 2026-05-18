@@ -7,8 +7,10 @@ import usersRouter from './src/routes/users.js';
 import eventsRouter from './src/routes/events.js';
 import ticketsRouter from './src/routes/tickets.js';
 import { errorHandler } from './src/middleware/auth.js';
+import { validateEnv } from './src/utils/validateEnv.js';
 
 dotenv.config();
+validateEnv();
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT || 3000);

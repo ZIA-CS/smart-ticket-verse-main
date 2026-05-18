@@ -8,13 +8,18 @@ import { Ticket } from '../entities/Ticket.js';
 
 dotenv.config();
 
+const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
+const useSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_DATABASE || 'smart_ticket_verse',
+  url: dbUrl || undefined,
+  host: dbUrl ? undefined : process.env.DB_HOST || 'localhost',
+  port: dbUrl ? undefined : parseInt(process.env.DB_PORT || '5432'),
+  username: dbUrl ? undefined : process.env.DB_USERNAME || 'postgres',
+  password: dbUrl ? undefined : process.env.DB_PASSWORD || 'password',
+  database: dbUrl ? undefined : process.env.DB_DATABASE || 'smart_ticket_verse',
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Result, Event, Ticket],
