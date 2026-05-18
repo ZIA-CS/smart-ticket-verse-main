@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import dotenv from 'dotenv';
+import dns from 'node:dns';
 import { DataSource } from 'typeorm';
 import { User } from '../entities/User.js';
 import { Result } from '../entities/Result.js';
@@ -7,6 +8,7 @@ import { Event } from '../entities/Event.js';
 import { Ticket } from '../entities/Ticket.js';
 
 dotenv.config();
+dns.setDefaultResultOrder('ipv4first');
 
 const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
 const useSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
