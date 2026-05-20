@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Users, Ticket as TicketIcon, Shield } from "lucide-react";
 import { api } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +31,9 @@ export default function AdminPage() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [eventsById, setEventsById] = useState<Map<string, string>>(new Map());
   const [usersById, setUsersById] = useState<Map<string, string>>(new Map());
+  const [roleFilter, setRoleFilter] = useState<"all" | AppRole>("all");
+  const [usersPage, setUsersPage] = useState(1);
+  const usersPageSize = 10;
 
   const fetchAll = async () => {
     const [usersRes, ticketsRes, eventsRes] = await Promise.all([
@@ -47,6 +59,29 @@ export default function AdminPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  const filteredUsers = users.filter((u) => {
+    const role: AppRole = (u.role as AppRole) || "user";
+    return roleFilter === "all" ? true : role === roleFilter;
+  });
+
+  const totalUsersPages = Math.max(1, Math.ceil(filteredUsers.length / usersPageSize));
+  const safeUsersPage = Math.min(usersPage, totalUsersPages);
+  const pagedUsers = filteredUsers.slice(
+    (safeUsersPage - 1) * usersPageSize,
+    safeUsersPage * usersPageSize
+  );
+
+  const goToUsersPage = (page: number) => {
+    const next = Math.max(1, Math.min(totalUsersPages, page));
+    setUsersPage(next);
+  };
+
+  useEffect(() => {
+    if (usersPage !== safeUsersPage) {
+      setUsersPage(safeUsersPage);
+    }
+  }, [usersPage, safeUsersPage]);
 
   const setRole = async (userId: string, role: AppRole) => {
     try {
@@ -85,21 +120,46 @@ export default function AdminPage() {
         </TabsList>
 
         <TabsContent value="users" className="glass-card rounded-xl p-2 mt-4">
+          <div className="flex flex-col gap-3 px-2 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Filter</span>
+              <Select
+                value={roleFilter}
+                onValueChange={(v) => {
+                  setRoleFilter(v as "all" | AppRole);
+                  setUsersPage(1);
+                }}
+              >
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {filteredUsers.length} users
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>First Name</TableHead>
+                <TableHead>Last Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Roles</TableHead>
                 <TableHead>Set role</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => {
+              {pagedUsers.map((u) => {
                 const highest: AppRole = (u.role as AppRole) || "user";
                 return (
                   <TableRow key={u.id}>
-                    <TableCell>{`${u.firstName || ""} ${u.lastName || ""}`.trim() || "—"}</TableCell>
+                    <TableCell>{u.firstName || "—"}</TableCell>
+                    <TableCell>{u.lastName || "—"}</TableCell>
                     <TableCell className="mono text-xs">{u.email}</TableCell>
                     <TableCell>
                       <Badge variant={highest === "admin" ? "default" : "secondary"} className="mr-1">{highest}</Badge>
@@ -119,6 +179,79 @@ export default function AdminPage() {
               })}
             </TableBody>
           </Table>
+          <div className="flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Page {safeUsersPage} of {totalUsersPages}
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goToUsersPage(safeUsersPage - 1);
+                    }}
+                    className={safeUsersPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {(() => {
+                  const pages: number[] = [];
+                  if (totalUsersPages <= 5) {
+                    for (let i = 1; i <= totalUsersPages; i += 1) pages.push(i);
+                  } else {
+                    const candidates = new Set([
+                      1,
+                      totalUsersPages,
+                      safeUsersPage,
+                      safeUsersPage - 1,
+                      safeUsersPage + 1,
+                    ]);
+                    [...candidates]
+                      .filter((page) => page >= 1 && page <= totalUsersPages)
+                      .sort((a, b) => a - b)
+                      .forEach((page) => pages.push(page));
+                  }
+
+                  return pages.map((page, index) => {
+                    const prev = pages[index - 1];
+                    const showEllipsis = index > 0 && prev !== undefined && page - prev > 1;
+                    return (
+                      <Fragment key={`page-${page}`}>
+                        {showEllipsis ? (
+                          <PaginationItem key={`ellipsis-${page}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : null}
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            isActive={page === safeUsersPage}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              goToUsersPage(page);
+                            }}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </Fragment>
+                    );
+                  });
+                })()}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goToUsersPage(safeUsersPage + 1);
+                    }}
+                    className={safeUsersPage === totalUsersPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </TabsContent>
 
         <TabsContent value="tickets" className="glass-card rounded-xl p-2 mt-4">

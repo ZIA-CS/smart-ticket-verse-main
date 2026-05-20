@@ -40,10 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    loadRoles().finally(() => {
-      setLoading(false);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Auto-logout on page refresh by clearing stored auth state.
+    clearToken();
+    setUser(null);
+    setRoles([]);
+    setLoading(false);
   }, []);
 
   const signIn = async (email: string, password: string) => {

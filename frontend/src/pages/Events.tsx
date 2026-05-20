@@ -33,6 +33,7 @@ export default function EventsPage() {
   const { user } = useAuth();
   const isAdmin = useHasRole("admin");
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -40,6 +41,8 @@ export default function EventsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<EventRow | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
 
   const [form, setForm] = useState({ title: "", description: "", eventDate: "", location: "", capacity: 100 });
 
@@ -59,6 +62,11 @@ export default function EventsPage() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => { fetchEvents(); /* eslint-disable-next-line */ }, [page, search]);
 
   const openCreate = () => {
@@ -76,6 +84,11 @@ export default function EventsPage() {
       capacity: ev.capacity,
     });
     setDialogOpen(true);
+  };
+
+  const openDetails = (ev: EventRow) => {
+    setSelectedEvent(ev);
+    setDetailsOpen(true);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -116,12 +129,13 @@ export default function EventsPage() {
     }
   };
 
-  const book = async (eventId: string) => {
+  const book = async (eventItem: EventRow) => {
     if (!user) return;
-    setBookingId(eventId);
+    setBookingId(eventItem.id);
     try {
-      await api.createTicket({ eventId, userId: user.id });
-      toast.success("Ticket booked! Check My Tickets.");
+      await api.createTicket({ eventId: eventItem.id, userId: user.id });
+      const eventTime = new Date(eventItem.eventDate).toLocaleString();
+      toast.success(`Ticket booked for ${eventTime}`);
     } catch (error: any) {
       toast.error(error.message || "Unable to book ticket");
     }
@@ -129,6 +143,22 @@ export default function EventsPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const formatCountdown = (ms: number) => {
+    if (ms <= 0) return "Event started";
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [
+      days ? `${days}d` : "",
+      `${String(hours).padStart(2, "0")}h`,
+      `${String(minutes).padStart(2, "0")}m`,
+      `${String(seconds).padStart(2, "0")}s`,
+    ].filter(Boolean);
+    return `Starts in ${parts.join(" ")}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -161,7 +191,19 @@ export default function EventsPage() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {events.map((ev) => (
-            <div key={ev.id} className="glass-card rounded-xl p-5 flex flex-col hover:border-primary/40 transition-colors">
+            <div
+              key={ev.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openDetails(ev)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openDetails(ev);
+                }
+              }}
+              className="glass-card rounded-xl p-5 flex flex-col hover:border-primary/40 transition-colors cursor-pointer"
+            >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="font-semibold text-lg leading-tight">{ev.title}</h3>
               </div>
@@ -171,19 +213,49 @@ export default function EventsPage() {
                   <CalendarDays className="h-3.5 w-3.5 text-primary" />
                   {new Date(ev.eventDate).toLocaleString()}
                 </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatCountdown(new Date(ev.eventDate).getTime() - now)}
+                </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5 text-accent" />
                   {ev.location}
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="hero" className="flex-1" onClick={() => book(ev.id)} disabled={bookingId === ev.id}>
+                <Button
+                  size="sm"
+                  variant="hero"
+                  className="flex-1"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    book(ev);
+                  }}
+                  disabled={bookingId === ev.id}
+                >
                   <TicketIcon className="h-3.5 w-3.5" /> Book
                 </Button>
                 {isAdmin && (
                   <>
-                    <Button size="icon" variant="outline" onClick={() => openEdit(ev)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="outline" onClick={() => remove(ev.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(ev);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        remove(ev.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </>
                 )}
               </div>
@@ -213,6 +285,43 @@ export default function EventsPage() {
             <div className="space-y-2"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} required /></div>
             <DialogFooter><Button type="submit" variant="hero">{editing ? "Save" : "Create"}</Button></DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedEvent?.title || "Event details"}</DialogTitle>
+          </DialogHeader>
+          {selectedEvent ? (
+            <div className="space-y-3">
+              {selectedEvent.description ? (
+                <p className="text-sm text-muted-foreground">{selectedEvent.description}</p>
+              ) : null}
+              <div className="text-sm space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  {new Date(selectedEvent.eventDate).toLocaleString()}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="h-4 w-4 text-accent" />
+                  {selectedEvent.location}
+                </div>
+                <div className="text-muted-foreground">Capacity: {selectedEvent.capacity}</div>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            {selectedEvent ? (
+              <Button
+                variant="hero"
+                onClick={() => selectedEvent && book(selectedEvent)}
+                disabled={bookingId === selectedEvent.id}
+              >
+                <TicketIcon className="h-4 w-4" /> Book Ticket
+              </Button>
+            ) : null}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

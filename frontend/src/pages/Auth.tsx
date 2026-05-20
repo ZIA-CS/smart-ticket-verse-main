@@ -29,6 +29,9 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
+  const canSignIn = email.trim().length > 0 && password.length > 0;
+  const canSignUp = fullName.trim().length > 0 && email.trim().length > 0 && password.length > 0;
+
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
   }, [user, navigate]);
@@ -40,8 +43,18 @@ export default function AuthPage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+    if (tab === "signin") setFullName("");
+  }, [tab]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSignIn) {
+      toast.error("Email and password are required");
+      return;
+    }
     const parsed = signInSchema.safeParse({ email, password });
     if (!parsed.success) {
       toast.error(parsed.error.errors[0].message);
@@ -61,6 +74,10 @@ export default function AuthPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSignUp) {
+      toast.error("Full name, email, and password are required");
+      return;
+    }
     const parsed = signUpSchema.safeParse({ email, password, fullName });
     if (!parsed.success) {
       toast.error(parsed.error.errors[0].message);
@@ -109,36 +126,36 @@ export default function AuthPage() {
             </TabsList>
 
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="off" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="off" />
                 </div>
-                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading}>
+                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !canSignIn}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
                 </Button>
               </form>
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4" autoComplete="off">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full name</Label>
-                  <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                  <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="off" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email-up">Email</Label>
-                  <Input id="email-up" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <Input id="email-up" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="off" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-up">Password</Label>
-                  <Input id="password-up" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  <Input id="password-up" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="off" />
                 </div>
-                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading}>
+                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !canSignUp}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
                 </Button>
               </form>

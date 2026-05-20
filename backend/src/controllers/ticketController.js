@@ -106,6 +106,28 @@ export const scanTicket = async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
+    if (ticket.status === 'expired') {
+      return res.status(400).json({ error: 'Ticket expired' });
+    }
+
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('eventDate')
+      .eq('id', ticket.eventId)
+      .maybeSingle();
+
+    if (eventError) {
+      return res.status(500).json({ error: eventError.message });
+    }
+
+    if (event?.eventDate && new Date(event.eventDate).getTime() < Date.now()) {
+      await supabase
+        .from('tickets')
+        .update({ status: 'expired' })
+        .eq('id', id);
+      return res.status(400).json({ error: 'Ticket expired' });
+    }
+
     if (ticket.status === 'used') {
       return res.status(400).json({ error: 'Ticket already used' });
     }

@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Result =
-  | { kind: "success"; event: string; user: string }
-  | { kind: "already"; event: string; usedAt: string }
+  | { kind: "success"; event: string; eventTime: string; userName: string; userEmail: string; userRole: string; status: string }
+  | { kind: "already"; event: string; eventTime: string; usedAt: string; userName: string; userEmail: string; userRole: string; status: string }
+  | { kind: "expired"; event: string; eventTime: string; userName: string; userEmail: string; userRole: string; status: string }
   | { kind: "notfound" }
   | { kind: "error"; msg: string };
 
@@ -39,9 +40,40 @@ export default function ScanPage() {
       const event = events.find((e) => e.id === ticket.eventId);
       const holder = users.find((u) => u.id === ticket.userId);
       const holderName = `${holder?.firstName || ""} ${holder?.lastName || ""}`.trim() || holder?.email || "Guest";
+      const holderEmail = holder?.email || "—";
+      const holderRole = holder?.role || "user";
+      const eventTime = event?.eventDate ? new Date(event.eventDate).toLocaleString() : "—";
+
+      if (event?.eventDate && new Date(event.eventDate).getTime() < Date.now() && ticket.status !== "used") {
+        try {
+          await api.scanTicket(ticket.id);
+        } catch {
+          // Ignore; backend marks the ticket expired.
+        }
+        setResult({
+          kind: "expired",
+          event: event?.title ?? "",
+          eventTime,
+          userName: holderName,
+          userEmail: holderEmail,
+          userRole: holderRole,
+          status: "expired",
+        });
+        setLoading(false);
+        return;
+      }
 
       if (ticket.status === "used") {
-        setResult({ kind: "already", event: event?.title ?? "", usedAt: ticket.usedAt || new Date().toISOString() });
+        setResult({
+          kind: "already",
+          event: event?.title ?? "",
+          eventTime,
+          usedAt: ticket.usedAt || new Date().toISOString(),
+          userName: holderName,
+          userEmail: holderEmail,
+          userRole: holderRole,
+          status: "used",
+        });
         setLoading(false);
         return;
       }
@@ -51,7 +83,11 @@ export default function ScanPage() {
       setResult({
         kind: "success",
         event: event?.title ?? "",
-        user: holderName,
+        eventTime,
+        userName: holderName,
+        userEmail: holderEmail,
+        userRole: holderRole,
+        status: "active",
       });
       setCode("");
     } catch (error: any) {
@@ -101,8 +137,10 @@ export default function ScanPage() {
               <CheckCircle2 className="h-10 w-10 text-success flex-shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold text-success">Entry granted</h3>
-                <p className="text-sm">{result.user}</p>
+                <p className="text-sm">{result.userName}</p>
+                <p className="text-xs text-muted-foreground">{result.userEmail} · {result.userRole}</p>
                 <p className="text-xs text-muted-foreground">{result.event}</p>
+                <p className="text-xs text-muted-foreground mono">{result.eventTime}</p>
               </div>
             </>
           )}
@@ -111,8 +149,23 @@ export default function ScanPage() {
               <AlertCircle className="h-10 w-10 text-warning flex-shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold text-warning">Already used</h3>
-                <p className="text-sm">{result.event}</p>
+                <p className="text-sm">{result.userName}</p>
+                <p className="text-xs text-muted-foreground">{result.userEmail} · {result.userRole}</p>
+                <p className="text-xs text-muted-foreground">{result.event}</p>
+                <p className="text-xs text-muted-foreground mono">{result.eventTime}</p>
                 <p className="text-xs text-muted-foreground mono">at {new Date(result.usedAt).toLocaleString()}</p>
+              </div>
+            </>
+          )}
+          {result.kind === "expired" && (
+            <>
+              <AlertCircle className="h-10 w-10 text-warning flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-semibold text-warning">Expired ticket</h3>
+                <p className="text-sm">{result.userName}</p>
+                <p className="text-xs text-muted-foreground">{result.userEmail} · {result.userRole}</p>
+                <p className="text-xs text-muted-foreground">{result.event}</p>
+                <p className="text-xs text-muted-foreground mono">{result.eventTime}</p>
               </div>
             </>
           )}

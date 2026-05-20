@@ -62,16 +62,24 @@ export default function TicketsPage() {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
-          {tickets.map((t) => (
+          {tickets.map((t) => {
+            const isExpired =
+              t.status !== "used" &&
+              t.event?.eventDate &&
+              new Date(t.event.eventDate).getTime() < Date.now();
+            const displayStatus = isExpired ? "expired" : t.status;
+            return (
             <div key={t.id} className="glass-card rounded-xl p-5 flex gap-4">
-              <div className={t.status === "used" ? "opacity-40 grayscale" : ""}>
+              <div className={displayStatus === "used" || displayStatus === "expired" ? "opacity-40 grayscale" : ""}>
                 <QrCode value={t.ticketCode} size={140} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold leading-tight">{t.event?.title}</h3>
-                  {t.status === "used" ? (
+                  {displayStatus === "used" ? (
                     <Badge variant="secondary" className="gap-1"><CheckCircle2 className="h-3 w-3" />Used</Badge>
+                  ) : displayStatus === "expired" ? (
+                    <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Expired</Badge>
                   ) : (
                     <Badge className="bg-primary text-primary-foreground gap-1"><Clock className="h-3 w-3" />Active</Badge>
                   )}
@@ -94,7 +102,8 @@ export default function TicketsPage() {
                 )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>
